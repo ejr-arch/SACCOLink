@@ -1,0 +1,559 @@
+================================================================================
+SACCOLink - CREDIT PASSPORT SYSTEM
+VIDEO DEMONSTRATION SCRIPT  (~13 minutes)
+
+Course      : CS 1301 - Practical Skills Oracle Database
+Exam        : End of Recess Term Practical Examination 2025/2026 (2 Aug 2026)
+Deliverable : 5 - Video Demonstration (Mandatory, 10-15 minutes)
+Student     : Kwagala Elvis
+Reg. No.    : ____________________   (FILL IN before recording)
+Programme   : Bachelor of Information Systems & Technology (IST), Year 1
+
+Rules for the recording:
+  * You must be on camera (your face) AND your computer screen must be visible
+    for the WHOLE video (split-screen / PiP).
+  * Do NOT read the script word-for-word - speak naturally from the bullet
+    points; the script is your plan, not your teleprompter.
+  * Keep every "MAIN TALKING POINT" - they map 1:1 to the examiners' checklist.
+  * IMPORTANT - BEFORE RECORDING, re-run the install on a fresh database so
+    your screen data matches the numbers in this script:
+        sqlplus saccolink/sacco123@//localhost:1521/XEPDB1 @saccolink_install.sql
+    Fresh install = 7 members, 14 loans, 217 savings, 7 scores, 4 passports,
+    8 app users, 3 loan requests.
+
+How to read this script:
+  [CAMERA]   = you speaking to the camera
+  [SCREEN]   = what to show on the computer screen while you speak
+  The narration under each point is a guide, not a fixed line.
+================================================================================
+
+--------------------------------------------------------------------------------
+TIMELINE OVERVIEW
+--------------------------------------------------------------------------------
+#   Segment                                Duration    Clock time
+1   Student introduction (on camera)       0:35        0:00 - 0:35
+2   The problem being solved               1:00        0:35 - 1:35
+3   Database design (ERD + relational)     1:40        1:35 - 3:15
+4   Oracle XE implementation (incl. opening SQL*Plus
+    and viewing the databases)            2:30        3:15 - 5:45
+5   SQL query demonstrations               2:00        5:45 - 7:45
+6   PL/SQL demonstrations                  2:15        7:45 - 10:00
+7   Application (GUI) demonstration        2:40       10:00 - 12:40
+8   Database security demonstration        1:10       12:40 - 13:50
+9   Reflection + closing (on camera)       0:40       13:50 - 14:30
+    -------------------------------------------------------------
+    TOTAL TARGET                         ~14:30  (within 10-15 min limit)
+    If you need to trim, shorten segments 5 and 6 by 15-20 seconds each.
+
+================================================================================
+SEGMENT 1 - STUDENT INTRODUCTION                       0:00 - 0:35   (0:35)
+================================================================================
+[CAMERA] Greet, then state the required details clearly:
+  * "Good morning / afternoon, my name is Kwagala Elvis."
+  * "My registration number is ______________."
+  * "I am a Year 1 student on the Bachelor of Information Systems and
+     Technology programme at Makerere University, CoCIS."
+  * Title of the project and one sentence on what it is:
+      "This is SACCOLink, a database-driven credit passport system for a
+       savings and credit cooperative (SACCO), built on Oracle Database
+       Express Edition 18c with PL/SQL and a Java Swing application."
+
+--------------------------------------------------------------------------------
+SEGMENT 2 - THE PROBLEM BEING SOLVED                   0:35 - 1:35   (1:00)
+--------------------------------------------------------------------------------
+[CAMERA] Speak conversationally about the real-world context:
+
+MAIN TALKING POINTS:
+  * Background: SACCOs collect savings and give loans to their members.
+    A member's repayment discipline and savings history are recorded inside
+    one SACCO only.
+  * Problem: when that member approaches another lender (for example a bank)
+    for a bigger loan, the lender has NO quick, trustworthy way to see the
+    member's actual credit track record. History stays locked inside the
+    SACCO's books; verification is slow, paper-based and easy to fake.
+  * Solution: SACCOLink stores each member's loans, savings and computed
+    credit score, and issues a short-lived "credit passport" - a token with a
+    72-hour expiry - that the member can hand to a bank. The bank enters the
+    token, the system verifies it and returns the genuine score and band.
+  * Users: SACCO staff (registration, loans, review), members (own history,
+    loan requests, passports), and banks (verification).
+  * Scope: eight tables, multi-user login, scoring, passport generation and
+    verification; no mobile-money integration (kept out of scope deliberately).
+
+--------------------------------------------------------------------------------
+SEGMENT 3 - DATABASE DESIGN (ERD + RELATIONAL)         1:35 - 3:15   (1:40)
+--------------------------------------------------------------------------------
+[SCREEN] Show the ERD image (docs / saccolink_erd.png, Figure 2.1 in report).
+[CAMERA + SCREEN] Point at entities with the mouse as you speak:
+
+MAIN TALKING POINTS:
+  * Eight entities: MEMBER, LOAN_RECORD, SAVINGS_RECORD, CREDIT_SCORE,
+    CREDIT_PASSPORT, CONSENT_AUDIT, APP_USER, LOAN_REQUEST.
+  * Show the relationships and cardinalities:
+      MEMBER 1---* LOAN_RECORD
+      MEMBER 1---* SAVINGS_RECORD
+      MEMBER 1---1 CREDIT_SCORE (current score)
+      MEMBER 1---* CREDIT_PASSPORT
+      MEMBER 1---* CONSENT_AUDIT (every consent change logged)
+      APP_USER *---1 MEMBER   (a member login maps to one member)
+      LOAN_REQUEST *---1 MEMBER
+  * Logic of the design: everything hangs off the member; a passport is a
+    snapshot of the score so a bank verifies a frozen, timestamped record.
+  * Normalization: designed to at least Third Normal Form - no repeating
+    groups, no partial dependencies (e.g. member details stored once in
+    MEMBER, not repeated on every loan/savings row), no transitive
+    dependencies (score band is DERIVED by a function, not stored redundantly).
+  * Logical model: primary keys are NUMBER + sequences, foreign keys reference
+    the parent keys, plus NOT NULL, unique (NIN) and check constraints.
+
+--------------------------------------------------------------------------------
+SEGMENT 4 - ORACLE DATABASE XE IMPLEMENTATION          3:15 - 5:45   (2:30)
+===============================================================================
+[SCREEN] Open a terminal, start SQL*Plus, connect to the SACCOLINK schema.
+[SCREEN] Show the install script location:  saccolink_install.sql
+
+-------------------------------------------------------------------------------
+PART A - OPENING SQL*PLUS AND VIEWING YOUR DATABASES   (first ~35 seconds)
+-------------------------------------------------------------------------------
+EXACT COMMAND - START SQL*PLUS:
+   sqlplus saccolink/sacco123@//localhost:1521/XEPDB1
+   (If the database runs on another machine, replace localhost:1521 with that
+    machine's host:port. XEPDB1 is the pluggable database name.)
+
+MAIN TALKING POINTS (how to "see" your databases):
+  * Oracle XE 18c is ONE instance with ONE pluggable database called XEPDB1.
+    You do not connect to "a list of databases" - you connect to XEPDB1 and
+    you are already inside your database. Your tables live in the SACCOLINK
+    schema.
+  * To show WHICH database / container you are in:
+        SELECT SYS_CONTEXT('USERENV', 'CON_NAME') FROM DUAL;   -> XEPDB1
+  * To LIST the pluggable databases that exist (needs DBA rights, so connect
+    as sys/system, not as SACCOLINK):
+        sqlplus sys/Oracle123@//localhost:1521/XEPDB1 as sysdba
+        SHOW PDBS;                                       -> XEPDB1
+        SELECT name, open_mode FROM v$pdbs;
+  * To see YOUR tables and every object in the SACCOLINK schema:
+        SELECT table_name FROM user_tables ORDER BY 1;         -> 8 tables
+        SELECT object_name, object_type FROM user_objects
+         WHERE object_type IN ('TABLE','VIEW','SEQUENCE','TRIGGER',
+                               'PROCEDURE','FUNCTION','PACKAGE',
+                               'PACKAGE BODY','SYNONYM')
+         ORDER BY object_type, object_name;
+  * In SQL Developer the same thing is the tree on the left: expand the
+    SACCOLINK connection to see Tables, Views, Procedures, Packages...
+  * Say: "A fresh XE install already contains my database. Everything the
+     system needs sits in one schema, and I prove that now."
+
+-------------------------------------------------------------------------------
+PART B - RUN THE INSTALL AND SHOW THE SCHEMA           (remaining ~1:55)
+-------------------------------------------------------------------------------
+EXACT COMMAND - RUN THE INSTALL (deliverable 2):
+   sqlplus saccolink/sacco123@//localhost:1521/XEPDB1 @saccolink_install.sql
+   (Run from the folder that contains the file, or give the full path. It
+    finishes with 'SACCOLink install completed successfully' and zero errors.)
+
+EXACT COMMANDS - PROVE EACH LAYER (run after the install):
+   1. The schema user (created once as SYS/system, before recording):
+        CREATE USER SACCOLINK IDENTIFIED BY sacco123
+          DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;
+        GRANT CONNECT, RESOURCE TO SACCOLINK;
+        GRANT CREATE ANY CONTEXT, CREATE ANY VIEW, CREATE SYNONYM TO SACCOLINK;
+   2. The eight tables + their columns:
+        SELECT table_name FROM user_tables ORDER BY 1;
+        SELECT column_name, data_type, data_length, nullable
+          FROM user_tab_columns WHERE table_name = 'MEMBER' ORDER BY column_id;
+   3. Constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK):
+        SELECT constraint_name, constraint_type, table_name, status
+          FROM user_constraints ORDER BY table_name, constraint_name;
+   4. Sequences + the BEFORE INSERT PK triggers:
+        SELECT sequence_name, increment_by, last_number
+          FROM user_sequences WHERE sequence_name LIKE 'SEQ_%' ORDER BY 1;
+        SELECT trigger_name, table_name, triggering_event, status
+          FROM user_triggers ORDER BY trigger_name;
+   5. Indexes on the foreign keys:
+        SELECT index_name, table_name, uniqueness
+          FROM user_indexes ORDER BY table_name;
+   6. Synonyms (friendly names):
+        SELECT synonym_name, table_owner, table_name
+          FROM user_synonyms ORDER BY 1;
+   7. Sample data (row counts per table, one statement):
+        SELECT (SELECT COUNT(*) FROM MEMBER)          AS members,
+               (SELECT COUNT(*) FROM LOAN_RECORD)     AS loans,
+               (SELECT COUNT(*) FROM SAVINGS_RECORD)  AS savings,
+               (SELECT COUNT(*) FROM CREDIT_SCORE)    AS scores,
+               (SELECT COUNT(*) FROM CREDIT_PASSPORT) AS passports,
+               (SELECT COUNT(*) FROM APP_USER)        AS app_users,
+               (SELECT COUNT(*) FROM LOAN_REQUEST)    AS loan_requests
+          FROM DUAL;
+      >> 7 members, 14 loans, 217 savings, 7 scores (one current per member),
+         4 passports, 8 app users, 3 loan requests
+  * Finish: "The schema, constraints, objects and data all exist; next we
+     prove the SQL and PL/SQL behave correctly."
+
+--------------------------------------------------------------------------------
+SEGMENT 5 - SQL QUERY DEMONSTRATIONS                   5:45 - 7:45   (2:00)
+===============================================================================
+[SCREEN] Run the queries one by one. These are the exact queries from
+sql/07_queries.sql. For each, say in ONE sentence what it does and what it
+proves (do NOT read the SQL aloud - talk about it).
+TIP: paste each query instead of typing it; if time is tight, run these live
+in this order: 1, 2, 3, 4a, 5a, 6.
+
+QUERY 1 - SELECT with WHERE + ORDER BY:
+   SELECT FULL_NAME, PHONE_NUMBER, DISTRICT
+     FROM MEMBER
+    WHERE DISTRICT = 'Kampala'
+    ORDER BY FULL_NAME;
+   >> 1 row: Grace Namukasa | 0772000001 | Kampala
+   Say: "WHERE filters, ORDER BY sorts."
+
+QUERY 2 - AGGREGATES + GROUP BY + HAVING (savers above 5,000,000 UGX):
+   SELECT m.FULL_NAME,
+          COUNT(s.SAVINGS_ID)              AS MONTHS_SAVED,
+          NVL(SUM(s.AMOUNT_CONTRIBUTED),0) AS TOTAL_SAVED
+     FROM MEMBER m
+     JOIN SAVINGS_RECORD s ON s.MEMBER_ID = m.MEMBER_ID
+    GROUP BY m.MEMBER_ID, m.FULL_NAME
+   HAVING NVL(SUM(s.AMOUNT_CONTRIBUTED),0) > 5000000
+    ORDER BY TOTAL_SAVED DESC;
+   >> 4 members: Grace 24,000,000 · Betty 12,000,000 · Hassan 6,000,000 ·
+      Sarah 5,400,000
+   Say: "COUNT and SUM aggregate, GROUP BY builds the groups, HAVING filters
+   the groups AFTER aggregation - that is why it is not WHERE."
+
+QUERY 3 - THREE-TABLE JOIN (passport + member + score):
+   SELECT p.QR_TOKEN, m.FULL_NAME, m.NIN, s.SCORE_VALUE, s.SCORE_BAND,
+          p.PASSPORT_STATUS, p.EXPIRES_AT
+     FROM CREDIT_PASSPORT p
+     JOIN MEMBER m        ON m.MEMBER_ID = p.MEMBER_ID
+     JOIN CREDIT_SCORE s  ON s.SCORE_ID  = p.SCORE_ID
+    WHERE p.PASSPORT_STATUS = 'ACTIVE'
+    ORDER BY p.EXPIRES_AT;
+   >> 4 rows: Grace (810 EXCELLENT), Sarah (788.18 EXCELLENT), Betty (801.43
+      EXCELLENT) and John (561 GOOD) - one ACTIVE passport each
+   Say: "One query pulls the passport, the member it belongs to and the score
+   it was based on - that is exactly why the data is normalised."
+
+QUERY 4a - SCALAR SUBQUERY (savers above the organisation average):
+   SELECT m.FULL_NAME, NVL(SUM(s.AMOUNT_CONTRIBUTED),0) AS TOTAL_SAVED
+     FROM MEMBER m
+     JOIN SAVINGS_RECORD s ON s.MEMBER_ID = m.MEMBER_ID
+    GROUP BY m.MEMBER_ID, m.FULL_NAME
+   HAVING NVL(SUM(s.AMOUNT_CONTRIBUTED),0) >
+          (SELECT AVG(AMOUNT_CONTRIBUTED) FROM SAVINGS_RECORD)
+    ORDER BY TOTAL_SAVED DESC;
+   >> 6 rows (everyone except Amina - her 100,000 is below the ~232,719
+      average)
+   Say: "The inner SELECT returns ONE value that the outer query compares
+   against."
+
+QUERY 4b - IN SUBQUERY (members who have taken a loan):
+   SELECT FULL_NAME, PHONE_NUMBER, DISTRICT
+     FROM MEMBER
+    WHERE MEMBER_ID IN (SELECT DISTINCT MEMBER_ID FROM LOAN_RECORD)
+    ORDER BY FULL_NAME;
+   >> 6 rows (everyone except Amina - she has no loan)
+
+QUERY 4c - CORRELATED SUBQUERY (loans bigger than the member's own average):
+   SELECT m.FULL_NAME, l.LOAN_AMOUNT, l.LOAN_STATUS
+     FROM LOAN_RECORD l
+     JOIN MEMBER m ON m.MEMBER_ID = l.MEMBER_ID
+    WHERE l.LOAN_AMOUNT >
+          (SELECT NVL(AVG(l2.LOAN_AMOUNT),0)
+             FROM LOAN_RECORD l2
+            WHERE l2.MEMBER_ID = l.MEMBER_ID)
+    ORDER BY m.FULL_NAME;
+   >> 6 rows on a fresh install - the loans bigger than their OWNER'S average:
+      Grace 3,000,000, Betty 4,000,000, Hassan 2,000,000, John 2,000,000 and
+      2,500,000, Sarah 1,500,000
+   Say: "Here the inner query runs AGAIN for every outer row - it references
+   the outer member."
+
+QUERY 5a - UNION (deduplicated merge):
+   SELECT MEMBER_ID, 'HAS_ACTIVE_PASSPORT' AS CATEGORY
+     FROM CREDIT_PASSPORT WHERE PASSPORT_STATUS = 'ACTIVE'
+   UNION
+   SELECT MEMBER_ID, 'HAS_CURRENT_SCORE' AS CATEGORY
+     FROM CREDIT_SCORE WHERE IS_CURRENT = 'Y'
+    ORDER BY MEMBER_ID;
+   >> 7 rows (every member, duplicates removed)
+
+QUERY 5b - INTERSECT (rows in both):
+   SELECT MEMBER_ID FROM LOAN_RECORD
+   INTERSECT
+   SELECT MEMBER_ID FROM SAVINGS_RECORD
+    ORDER BY MEMBER_ID;
+   >> 6 rows (members 1,2,3,5,6,7 - those with BOTH a loan and savings)
+
+QUERY 5c - MINUS (rows in the first only):
+   SELECT MEMBER_ID FROM CREDIT_SCORE WHERE IS_CURRENT = 'Y'
+   MINUS
+   SELECT MEMBER_ID FROM CREDIT_PASSPORT
+    ORDER BY MEMBER_ID;
+   >> 3 rows (members 2, 3, 4 - Okello, Hassan and Amina: scored but never
+      generated a passport)
+
+QUERY 6 - VIEW (reporting through V_PASSPORT_DETAIL):
+   SELECT FULL_NAME, SCORE_BAND, PASSPORT_STATUS
+     FROM V_PASSPORT_DETAIL
+    WHERE SCORE_BAND = 'EXCELLENT';
+   >> 3 rows (Grace, Sarah and Betty - the three EXCELLENT passports; John's
+      561 is GOOD)
+   Say: "Reports select from a VIEW, so the join is written once and hidden
+   from the query."
+
+--------------------------------------------------------------------------------
+SEGMENT 6 - PL/SQL DEMONSTRATIONS                      7:45 - 10:00  (2:15)
+===============================================================================
+[SCREEN] Run real PL/SQL calls so the output is on screen.
+
+MAIN TALKING POINTS:
+  * The PL/SQL layer lives in PACKAGES: PKG_SACCOINK (core business logic),
+    PKG_SACCOINK_REPORT (reporting), PKG_APP_SESSION (login + row security).
+  * Show the PL/SQL objects:
+        SELECT object_name, object_type FROM user_objects
+         WHERE object_type IN ('PROCEDURE','FUNCTION','PACKAGE','PACKAGE BODY')
+         ORDER BY object_type, object_name;
+  * Procedures (name + one-line purpose):
+      SP_COMPUTE_SCORE      - runs the 60/40 formula and stores CREDIT_SCORE
+      SP_GENERATE_PASSPORT  - creates a 72-hour passport with a 32-char token
+      SP_EXPIRE_PASSPORTS   - marks overdue passports EXPIRED
+      SP_LOGIN              - validates login against APP_USER
+      SP_REQUEST_LOAN       - member submits a loan request
+      SP_REVIEW_LOAN        - SACCO approves (creates ACTIVE loan) or rejects
+  * Functions:
+      FN_GET_SCORE_BAND  - maps a 0-850 score to a band
+      FN_HASH_PASSWORD   - SHA-256 hashes a password
+      FN_VERIFY_PASSPORT - the function the BANK calls: validates token,
+                           expiry, status and increments the view count
+
+EXACT COMMANDS - LIVE DEMO (run these):
+
+  1. RECOMPUTE GRACE'S SCORE (member 1):
+        SET SERVEROUTPUT ON
+        BEGIN
+          PKG_SACCOINK.COMPUTE_SCORE(1);
+          DBMS_OUTPUT.PUT_LINE('Grace score recomputed');
+        END;
+        /
+        SELECT SCORE_VALUE, SCORE_BAND, REPAYMENT_SCORE, SAVINGS_SCORE,
+               IS_CURRENT
+          FROM CREDIT_SCORE WHERE MEMBER_ID = 1 ORDER BY COMPUTED_AT DESC;
+     >> newest row 810 | EXCELLENT | IS_CURRENT = Y; the older row flips to N
+     Say: "SP_COMPUTE_SCORE runs the 60/40 formula and keeps one current row."
+
+  2. BAND FUNCTION:
+        SELECT 810 AS SCORE, FN_GET_SCORE_BAND(810) AS BAND FROM DUAL;
+     >> 810 | EXCELLENT
+
+  3. GENERATE A PASSPORT (prints a real 32-char QR token):
+        SET SERVEROUTPUT ON
+        DECLARE
+          v_pid NUMBER;
+          v_tok VARCHAR2(64);
+        BEGIN
+          PKG_SACCOINK.GENERATE_PASSPORT(1, v_pid, v_tok);
+          DBMS_OUTPUT.PUT_LINE('Passport ID: ' || v_pid);
+          DBMS_OUTPUT.PUT_LINE('QR token   : ' || v_tok);
+        END;
+        /
+     >> copy the QR token shown - you will paste it into step 4
+     NOTE: this adds one passport (the count becomes 5) - fine for the demo.
+
+  4. VERIFY IT LIKE THE BANK WOULD (replace <TOKEN> with the one copied):
+        SET SERVEROUTPUT ON
+        DECLARE
+          v_tok  VARCHAR2(64) := '<TOKEN>';
+          v_nm   VARCHAR2(200);
+          v_sc   NUMBER;
+          v_band VARCHAR2(20);
+          v_gen  TIMESTAMP;
+          v_exp  TIMESTAMP;
+        BEGIN
+          DBMS_OUTPUT.PUT_LINE('Result: ' ||
+            PKG_SACCOINK.VERIFY_PASSPORT(v_tok, v_nm, v_sc, v_band, v_gen, v_exp));
+          DBMS_OUTPUT.PUT_LINE(v_nm || ' | score ' || v_sc || ' | ' || v_band);
+        END;
+        /
+        SELECT PASSPORT_ID, VIEW_COUNT FROM CREDIT_PASSPORT
+         WHERE QR_TOKEN = '<TOKEN>';
+     >> VALID | Grace Namukasa | 810 | EXCELLENT, and VIEW_COUNT incremented
+     Say: "FN_VERIFY_PASSPORT is the bank's function - token, expiry, status
+     are all checked and the view counter goes up."
+
+  5. EXPIRE PASSED PASSPORTS:
+        BEGIN PKG_SACCOINK.EXPIRE_PASSPORTS; END;
+        /
+        SELECT PASSPORT_STATUS, COUNT(*) FROM CREDIT_PASSPORT
+         GROUP BY PASSPORT_STATUS;
+     >> all passports still ACTIVE (none is older than 72 hours yet)
+
+  6. EXPLICIT CURSOR (OPEN / FETCH / %ROWTYPE / CLOSE inside the package):
+        SET SERVEROUTPUT ON
+        BEGIN
+          FOR r IN (SELECT MEMBER_ID, FULL_NAME FROM MEMBER ORDER BY FULL_NAME) LOOP
+            DBMS_OUTPUT.PUT_LINE(r.FULL_NAME || ' owes ' ||
+              TO_CHAR(PKG_SACCOINK.OUTSTANDING_BALANCE(r.MEMBER_ID),
+                      'FM999,999,999') || ' UGX on active loans');
+          END LOOP;
+        END;
+        /
+     >> Okello 1,000,000 ; John 4,500,000 (2,000,000 seed ACTIVE loan plus
+        2,500,000 approved by the install demo) ; everyone else 0
+     Say: "The balance is summed with an explicit cursor - OPEN, FETCH,
+     %ROWTYPE, CLOSE."
+
+  7. TRIGGERS - show all 8:
+        SELECT TRIGGER_NAME, TABLE_NAME, TRIGGER_TYPE, TRIGGERING_EVENT, STATUS
+          FROM USER_TRIGGERS ORDER BY TRIGGER_NAME;
+     >> 7 BEFORE INSERT PK triggers + TRG_MEMBER_CONSENT_AUDIT
+     Then DEMO the consent-audit trigger (flip Grace's consent twice):
+        UPDATE MEMBER SET CONSENT_GIVEN = 'N' WHERE MEMBER_ID = 1;
+        UPDATE MEMBER SET CONSENT_GIVEN = 'Y' WHERE MEMBER_ID = 1;
+        SELECT AUDIT_ID, MEMBER_ID, OLD_CONSENT, NEW_CONSENT, CHANGED_BY
+          FROM CONSENT_AUDIT ORDER BY AUDIT_ID;
+     >> two new audit rows logging Y->N then N->Y
+     NOTE: this restores Grace's consent to Y, so her passport still works.
+
+  8. EXCEPTION HANDLING - an unknown token must not crash:
+        SET SERVEROUTPUT ON
+        DECLARE
+          v_nm   VARCHAR2(200);
+          v_sc   NUMBER;
+          v_band VARCHAR2(20);
+          v_gen  TIMESTAMP;
+          v_exp  TIMESTAMP;
+        BEGIN
+          DBMS_OUTPUT.PUT_LINE('Result: ' ||
+            PKG_SACCOINK.VERIFY_PASSPORT('BADTOKEN-ABC', v_nm, v_sc, v_band,
+                                         v_gen, v_exp));
+        END;
+        /
+     >> NOT_FOUND (the function catches NO_DATA_FOUND instead of crashing)
+
+--------------------------------------------------------------------------------
+SEGMENT 7 - APPLICATION (GUI) DEMONSTRATION            10:00 - 12:40  (2:40)
+--------------------------------------------------------------------------------
+[SCREEN] Show the Java Swing application. Start from the login dialog.
+
+MAIN TALKING POINTS:
+  * Start the app: src/run.sh - it connects over JDBC to the Oracle container
+    automatically, then asks for the application login.
+  * LOGIN AS SACCO (username sacco / password sacco123):
+      1. Dashboard - organisation totals: 7 members, 14 loans, outstanding
+         balance, total savings, average score, pending requests.
+      2. Member Registration - register a member, note the CONSENT checkbox
+         (consent is required before a passport can be generated).
+      3. Member List - search + consent filter; edit a member.
+      4. Loan Entry / Loan List - record a loan; filter and search; edit.
+      5. Savings Entry - one contribution per member per month (DB enforces).
+      6. Savings Report - per-member totals + grand total.
+      7. Compute Score - recompute Grace's score live, show 0-850 + band.
+      8. Score Display - all current scores with 60%/40% sub-scores.
+      9. Generate Passport - press the "Generate New Passport" button to
+         issue the 32-char token, expiry 72 hours, and COPY it.
+     10. Bank Verification - paste the token, Verify -> returns VALID, member
+         name, score, band, generated/expires timestamps (view count +1).
+     11. Passport Log - statuses ACTIVE/EXPIRED/REVOKED; revoke + expire.
+     12. Loan Requests - SACCO selects a PENDING request, Check
+         Creditworthiness (score + loan/savings totals), then Approve ->
+         records the loan as ACTIVE; or Reject.
+  * LOGOUT, then LOGIN AS MEMBER (grace / member123):
+      * Note the sidebar SHRINKS from 13 to 7 pages - no member list, no loan
+        entry, no registration - members only see their own data.
+      * My Dashboard, My Loans, My Savings Report, My Score, Request Loan,
+        My Passports, Generate Passport.
+      * Submit a loan request as grace and show it appears as PENDING for the
+        SACCO side (this proves the multi-user workflow).
+  * Mention: forms validate input (dates, positive amounts, NIN length) and
+    show friendly error dialogs instead of raw SQL errors.
+
+--------------------------------------------------------------------------------
+SEGMENT 8 - DATABASE SECURITY DEMONSTRATION            12:40 - 13:50  (1:10)
+===============================================================================
+[SCREEN] Return to SQL*Plus for the security part.
+
+MAIN TALKING POINTS + EXACT COMMANDS:
+
+  1. PASSWORDS ARE HASHED - you cannot read them back:
+        SELECT USER_ID, USERNAME, ROLE, MEMBER_ID, DISPLAY_NAME,
+               SUBSTR(PASSWORD_HASH, 1, 20) AS HASH_PREFIX
+          FROM APP_USER ORDER BY USER_ID;
+        SELECT FN_HASH_PASSWORD('grace', 'member123') AS hash FROM DUAL;
+     Say: "The stored hash matches the freshly computed one, but the plain
+     password never appears anywhere - SHA-256 via FN_HASH_PASSWORD."
+
+  2. ROW-LEVEL SECURITY - one schema, different rows per user:
+     As SACCO (fresh login, no member context):
+        SELECT COUNT(*) FROM V_MY_LOANS;             >> 14 (sees everyone)
+     Act as Grace (set the application context - trusted package only):
+        BEGIN PKG_APP_SESSION.SET_MEMBER(1); END;
+        /
+        SELECT SYS_CONTEXT('saccolink_ctx', 'MEMBER_ID') FROM DUAL;  >> 1
+        SELECT COUNT(*) FROM V_MY_LOANS;             >> 3 (only Grace's)
+        SELECT * FROM V_MY_SCORES;                   >> only Grace's scores
+     Back to SACCO (clear the context):
+        BEGIN PKG_APP_SESSION.CLEAR; END;
+        /
+        SELECT COUNT(*) FROM V_MY_LOANS;             >> 14 again
+     Say: "The V_MY_* views check SYS_CONTEXT('saccolink_ctx','MEMBER_ID')
+     on every row - a MEMBER gets only their own rows, SACCO gets everything."
+
+  3. MINIMAL PRIVILEGES (run as SYS/system to show SACCOLINK's grants):
+        SELECT privilege FROM dba_sys_privs
+         WHERE grantee = 'SACCOLINK' ORDER BY 1;
+     >> CONNECT, RESOURCE, CREATE ANY CONTEXT, CREATE ANY VIEW, CREATE SYNONYM
+     Say: "No DBA - just enough to run the schema and the application context."
+
+  4. BACKUP STRATEGY - two ways to rebuild:
+     Data Pump export (full schema dump):
+        expdp saccolink/sacco123@//localhost:1521/XEPDB1 schemas=SACCOLINK
+             directory=DATA_PUMP_DIR dumpfile=saccolink.dmp logfile=saccolink.log
+     Re-runnable rebuild script (deliverable 2):
+        sqlplus saccolink/sacco123@//localhost:1521/XEPDB1 @saccolink_install.sql
+
+--------------------------------------------------------------------------------
+SEGMENT 9 - REFLECTION + CLOSING                       13:50 - 14:30  (0:40)
+--------------------------------------------------------------------------------
+[CAMERA] Wrap up conversationally - this is your own honest reflection:
+
+MAIN TALKING POINTS:
+  * Challenges: sequencing objects in the install script (triggers before
+    data, packages after functions); the ORA-01031 surprise when setting the
+    application context from anonymous blocks (it must be set from a trusted
+    package - which is exactly the security we wanted); getting the 60/40
+    scoring formula right for members with few loans.
+  * How Oracle XE helped: a full relational DB, PL/SQL packages, triggers,
+    application contexts and security in one self-contained edition that runs
+    on a laptop; the Java GUI then just talks to it over JDBC.
+  * Most useful features: packages (clean structure), triggers (PK + audit),
+    application context + views (row-level security), and functions returning
+    verifiable results.
+  * Improvements with more time: a web/APEX front end, more scoring factors
+    (mobile-money, employment), QR codes rendered as images, and a proper
+    audit dashboard.
+  * Close: "That completes my demonstration. Thank you for watching."
+
+================================================================================
+CHECKLIST - MAKE SURE THE VIDEO SHOWS ALL OF THESE
+================================================================================
+[ ] Your face on camera for the whole video
+[ ] Screen visible for the whole video
+[ ] Intro with name + registration number + programme
+[ ] Problem described in your own words
+[ ] ERD shown and explained (entities, relationships, cardinalities)
+[ ] Relational / 3NF explanation
+[ ] Oracle XE: install script runs with zero errors
+[ ] SQL*Plus: connect and VIEW the databases (SYS_CONTEXT/CON_NAME, SHOW PDBS
+    as sys, user_tables)
+[ ] SQL: WHERE, ORDER BY, GROUP BY, HAVING, aggregates, joins, subqueries,
+    set operators, views - typed/pasted live with real output
+[ ] PL/SQL: procedures, functions, packages, cursor, triggers, exception
+    handling
+[ ] Application: login, dashboard, entry/edit forms, search, reports,
+    navigation, validation, error messages
+[ ] Security: hashed passwords, context row-level security, roles in GUI,
+    privileges, backup strategy
+[ ] Reflection on lessons learned and challenges
+[ ] Total runtime between 10 and 15 minutes
+================================================================================
